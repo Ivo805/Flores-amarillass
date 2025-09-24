@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Flores Amarillas — Fuegos Artificiales</title>
+  <style>
+    :root{
+      --bg1:#030712;
+      --bg2:#0b1220;
+      --accent:#f7c948;
+      --accent-2:#ffd84d;
+      --center:#ffb703;
+      --text:#e5e7eb;
+    }
+    html, body{
+      margin:0; height:100%; overflow:hidden; background: radial-gradient(1200px 800px at 70% 20%, #121a2e 0%, var(--bg2) 40%, var(--bg1) 100%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, 'Helvetica Neue', Arial;
+      color:var(--text);
+    }
+    #ui{ position:fixed; inset:0; pointer-events:none; display:flex; flex-direction:column; justify-content:space-between; }
+
+    header{ display:flex; justify-content:center; align-items:flex-start; padding:1rem; pointer-events:none; }
+    .dedication{ font-size: clamp(1rem, 2vw + .2rem, 1.4rem); font-weight:700; color:#fff; text-shadow:0 0 12px #f87171aa, 0 0 30px #f87171aa, 0 2px 8px #0008; }
+
+    footer{ display:flex; justify-content:center; align-items:flex-end; padding:1.25rem; pointer-events:none; }
+    .love{ font-size: clamp(1.2rem, 2.5vw + .2rem, 1.8rem); font-weight:800; text-align:center; color:#fff; text-shadow: 0 0 20px #facc15aa, 0 0 50px #facc15aa, 0 2px 12px #0008; margin-top:.35rem; }
+    .bottom-ui{ display:flex; flex-direction:column; align-items:center; gap:.5rem; pointer-events:auto; }
+
+    .btn{ pointer-events:auto; border:none; border-radius:999px; padding:.65rem 1rem; font-weight:700; letter-spacing:.3px; background:linear-gradient(180deg, #ffe36a, #ffc107); color:#1f2937; box-shadow: 0 8px 20px #0006, inset 0 1px 0 #fff6; cursor:pointer; transition: transform .08s ease, filter .2s ease; margin-bottom:.25rem; }
+    .btn:active{ transform: translateY(1px) scale(.99); }
+
+    canvas{ position:fixed; inset:0; width:100%; height:100%; display:block; }
+
+    .stars{ position:fixed; inset:0; background-image:
+      radial-gradient(1px 1px at 10% 20%, #fff6 40%, transparent 41%),
+      radial-gradient(1px 1px at 80% 30%, #fff8 40%, transparent 41%),
+      radial-gradient(1px 1px at 30% 70%, #fffb 40%, transparent 41%),
+      radial-gradient(1px 1px at 60% 80%, #fff5 40%, transparent 41%),
+      radial-gradient(1px 1px at 50% 40%, #fff6 40%, transparent 41%),
+      radial-gradient(1px 1px at 20% 85%, #fff6 40%, transparent 41%);
+      background-repeat:repeat; opacity:.5; pointer-events:none; filter: drop-shadow(0 0 2px #fff4);
+    }
+  </style>
+</head>
+<body>
+  <div class="stars" aria-hidden="true"></div>
+  <canvas id="scene" aria-label="Flores amarillas como fuegos artificiales"></canvas>
+
+  <div id="ui">
+    <header>
+      <div class="dedication">Con todo mi amor, para ti ❤️</div>
+    </header>
+    <footer>
+      <div class="bottom-ui">
+        <button id="burstBtn" class="btn" title="Lanzar más flores">FLOREEES</button>
+        <div class="love">Te amo mi niña hermosa ❤️🌻</div>
+      </div>
+    </footer>
+  </div>
+
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const DPR = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+
+    let W = 0, H = 0, running = false;
+    function resize(){
+      W = canvas.width = Math.floor(innerWidth * DPR);
+      H = canvas.height = Math.floor(innerHeight * DPR);
+    }
+    addEventListener('resize', resize, {passive:true});
+    resize();
+
+    const rand = (a,b)=> a + Math.random()*(b-a);
+    const TAU = Math.PI*2;
+
+    const rockets = [];
+    const particles = [];
+
+    class Rocket{
+      constructor(x, y, vx, vy, tint){
+        this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.ax=0; this.ay=0.12;
+        this.life=rand(40,60); this.t=0; this.tint=tint;
+      }
+      step(){
+        this.t++;
+        this.vx += this.ax; this.vy += this.ay;
+        this.x += this.vx; this.y += this.vy;
+        for(let i=0;i<2;i++){
+          particles.push(new Spark(this.x, this.y, rand(-0.5,0.5), rand(-0.5,0.5), this.tint, 0.7, 18));
+        }
+        if(this.t>this.life || this.vy>0){ this.explode(); return false; }
+        return true;
+      }
+      explode(){
+        const petals = Math.floor(rand(24, 42));
+        const speed = rand(4.5, 6.5);
+        for(let i=0;i<petals;i++){
+          const a = (i/petals)*TAU + rand(-0.05,0.05);
+          const v = speed * (0.9 + 0.2*Math.random());
+          particles.push(new FlowerShard(this.x, this.y, Math.cos(a)*v, Math.sin(a)*v, this.tint));
+        }
+        for(let i=0;i<12;i++){
+          const a = rand(0,TAU), v = rand(1.5, 3.5);
+          particles.push(new Spark(this.x, this.y, Math.cos(a)*v, Math.sin(a)*v, '#ffb703', 1.2, 32));
+        }
+      }
+    }
+
+    class Spark{
+      constructor(x,y,vx,vy,color,scale=1,life=24){
+        this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.color=color; this.life=life; this.t=0; this.scale=scale;
+      }
+      step(){
+        this.t++; this.vy += 0.04; this.vx *= 0.99; this.vy *= 0.99;
+        this.x += this.vx; this.y += this.vy;
+        return this.t < this.life;
+      }
+      draw(){
+        const a = 1 - this.t/this.life;
+        ctx.globalAlpha = Math.max(0, a);
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, 2*this.scale, 0, TAU);
+        ctx.fillStyle = this.color; ctx.fill();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function drawPetal(x,y,r,rot,fill){
+      ctx.save();
+      ctx.translate(x,y);
+      ctx.rotate(rot);
+      ctx.scale(1.2, 0.8);
+      ctx.beginPath();
+      ctx.ellipse(0, -r*0.6, r*0.9, r*0.55, 0, 0, TAU);
+      const grad = ctx.createRadialGradient(0, -r*0.75, 0, 0, -r*0.75, r*0.9);
+      grad.addColorStop(0, '#fff7cc');
+      grad.addColorStop(0.35, fill);
+      grad.addColorStop(1, '#d9a81f');
+      ctx.fillStyle = grad;
+      ctx.fill();
+      ctx.restore();
+    }
+
+    class FlowerShard{
+      constructor(x,y,vx,vy,tint){
+        this.x=x; this.y=y; this.vx=vx; this.vy=vy; this.ax=0; this.ay=0.05; this.tint=tint || '#ffd84d';
+        this.life = 85 + Math.floor(Math.random()*25);
+        this.t=0; this.r = rand(6, 11);
+        this.spin = rand(-0.15, 0.15);
+      }
+      step(){
+        this.t++;
+        this.vx *= 0.992; this.vy = this.vy*0.992 + this.ay;
+        this.x += this.vx; this.y += this.vy;
+        if(Math.random() < 0.4){
+          particles.push(new Spark(this.x, this.y, rand(-0.2,0.2), rand(-0.2,0.2), this.tint, 0.8, 18));
+        }
+        return this.t < this.life;
+      }
+      draw(){
+        const prog = this.t/this.life;
+        const alpha = 1 - prog*prog;
+        const petalCount = 5;
+        const flowerRot = this.spin * this.t;
+        ctx.save();
+        ctx.globalAlpha = Math.max(0, alpha);
+        const glow = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r*3);
+        glow.addColorStop(0, this.tint + 'cc');
+        glow.addColorStop(1, '#0000');
+        ctx.fillStyle = glow;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r*2.2, 0, TAU);
+        ctx.fill();
+        for(let i=0;i<petalCount;i++){
+          const a = flowerRot + (i/petalCount)*TAU;
+          drawPetal(this.x + Math.cos(a)*this.r*0.2, this.y + Math.sin(a)*this.r*0.2, this.r, a, this.tint);
+        }
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.r*0.5, 0, TAU);
+        const cgrad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.r*0.6);
+        cgrad.addColorStop(0, '#ffe8b3');
+        cgrad.addColorStop(1, '#ffb703');
+        ctx.fillStyle = cgrad;
+        ctx.fill();
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
+    }
+
+    function launch(x = rand(W*0.2, W*0.8), y = H + 10){
+      const angle = rand(-Math.PI*0.9, -Math.PI*0.1);
+      const speed = rand(7.5, 9.5);
+      const vx = Math.cos(angle)*speed * rand(0.85,1.15);
+      const vy = Math.sin(angle)*speed * rand(0.85,1.15);
+      const yellow = Math.random() < 0.5 ? '#ffd84d' : '#f7c948';
+      rockets.push(new Rocket(x, y, vx, vy, yellow));
+    }
+
+    let autoTimer = 0;
+    function tick(){
+      if(!running){ return; }
+      requestAnimationFrame(tick);
+      ctx.clearRect(0,0,W,H);
+
+      const fog = ctx.createLinearGradient(0,0,0,H);
+      fog.addColorStop(0, 'rgba(10, 16, 30, 0)');
+      fog.addColorStop(1, 'rgba(10, 16, 30, 0.25)');
+      ctx.fillStyle = fog; ctx.fillRect(0,0,W,H);
+
+      for(let i=rockets.length-1;i>=0;i--){ if(!rockets[i].step()){ rockets.splice(i,1); } }
+      for(let i=particles.length-1;i>=0;i--){ const p=particles[i]; if(!p.step()){ particles.splice(i,1); } }
+
+      for(const p of particles){ p.draw && p.draw(); }
+
+      if(autoTimer++ % 50 === 0){ launch(); }
+    }
+
+    const burstBtn = document.getElementById('burstBtn');
+    burstBtn.addEventListener('click', ()=>{
+      if(!running){ running = true; tick(); }
+      for(let i=0;i<2;i++) launch();
+    });
+
+    canvas.addEventListener('pointerdown', (e)=>{
+      if(!running){ running = true; tick(); }
+      const rect = canvas.getBoundingClientRect();
+      const x = (e.clientX - rect.left) * DPR;
+      launch(x, H+10);
+    });
+
+    addEventListener('keydown', ()=>{ if(!running){ running=true; tick(); } }, {once:true});
+    addEventListener('pointerdown', ()=>{ if(!running){ running=true; tick(); } }, {once:true, passive:true});
+  </script>
+</body>
+</html>
